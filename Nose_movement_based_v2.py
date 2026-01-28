@@ -73,7 +73,7 @@ class DragBlinkTracker:
         dx_norm = np.tanh(dx_raw * self.norm_factor)
         dy_norm = np.tanh(dy_raw * self.norm_factor)
         speed = np.sqrt(dx_raw**2 + dy_raw**2)
-        accel_factor = 0.1 + speed * 0.0005
+        accel_factor = 0.1 + speed * 0.001
         scale = (0.12 + accel_factor) * sensitivity
         return dx_norm * screen_w * scale, dy_norm * screen_h * scale
 
@@ -151,24 +151,18 @@ class DragBlinkTracker:
                 left_blink = self.detect_smart_left_blink(landmarks, h)
                 right_blink = self.detect_smart_right_blink(landmarks, h)
                 
-                # LEFT BLINK → TOGGLE DRAG MODE
-                if left_blink and time.time() - self.left_click_cooldown > 0.6:
-                    self.is_dragging = not self.is_dragging
-                    if self.is_dragging:
-                        pyautogui.mouseDown()  # Start drag
-                        self.drag_start_time = time.time()
-                    else:
-                        pyautogui.mouseUp()    # End drag
+                # LEFT BLINK → LEFT CLICK
+                if left_blink and time.time() - self.left_click_cooldown > 0.5:
+                    pyautogui.leftClick()
                     self.left_click_cooldown = time.time()
                 
                 # RIGHT BLINK → RIGHT CLICK
-                if right_blink and time.time() - self.right_click_cooldown > 0.6:
+                if right_blink and time.time() - self.right_click_cooldown > 0.5:
                     pyautogui.rightClick()
                     self.right_click_cooldown = time.time()
                 
                 # VISUAL FEEDBACK
-                drag_status = "DRAG ON" if self.is_dragging else "DRAG OFF"
-                cv2.putText(frame, f"LEFT BLINK: {drag_status}", (50, 50), 
+                cv2.putText(frame, f"LEFT BLINK: Left Click", (50, 50), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0) if self.is_dragging else (0, 165, 255), 2)
                 cv2.putText(frame, "RIGHT BLINK: Right Click", (50, 80), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
