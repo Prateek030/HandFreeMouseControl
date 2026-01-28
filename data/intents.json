@@ -1,0 +1,48 @@
+# ===================== INTENTS =====================
+INTENTS = {
+    "COPY": {
+        "phrases": ["copy", "make a copy", "duplicate"],
+        "action": lambda: keyboard.press_and_release("ctrl+c"),
+        "mode": "EDIT"
+    },
+    "PASTE": {
+        "phrases": ["paste", "insert here"],
+        "action": lambda: keyboard.press_and_release("ctrl+v"),
+        "mode": "EDIT"
+    },
+    "CUT": {
+        "phrases": ["cut", "remove selection"],
+        "action": lambda: keyboard.press_and_release("ctrl+x"),
+        "mode": "EDIT"
+    },
+    "UNDO": {
+        "phrases": ["undo", "go back"],
+        "action": lambda: keyboard.press_and_release("ctrl+z"),
+        "mode": "EDIT"
+    },
+    "NEW_TAB": {
+        "phrases": ["new tab", "open new tab"],
+        "action": lambda: keyboard.press_and_release("ctrl+t"),
+        "mode": "BROWSER"
+    },
+    "ADDRESS_BAR": {
+        "phrases": ["address bar", "search bar", "url bar"],
+        "action": lambda: keyboard.press_and_release("ctrl+l"),
+        "mode": "BROWSER"
+    },
+    "SEARCH": {
+        "phrases": ["search", "find", "look up"],
+        "action": "SEARCH_QUERY",
+        "mode": "BROWSER"
+    },
+    "OPEN_APP": {
+        "phrases": ["open", "launch", "start"],
+        "action": "OPEN_APPLICATION",
+        "mode": "SYSTEM"
+    },
+    "SCREENSHOT": {
+        "phrases": ["screenshot", "take screenshot"],
+        "action": lambda: keyboard.press_and_release("win+shift+s"),
+        "mode": "SYSTEM"
+    },
+}
