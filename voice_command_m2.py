@@ -5,159 +5,239 @@ import tkinter as tk
 from tkinter import ttk
 import threading
 import json
-import sys
+import time
+import difflib
+from datetime import datetime
 
-# Your provided shortcuts as a dict for easy mapping (voice phrase -> shortcut keys)
-SHORTCUTS = {
-    # Critical Shortcuts
-    "copy": "ctrl+c",
-    "paste": "ctrl+v",
-    "cut": "ctrl+x",
-    "undo": "ctrl+z",
-    "redo": "ctrl+y",
-    "select all": "ctrl+a",
-    "save": "ctrl+s",
-    
-    # Window & App Control
-    "close window": "alt+f4",
-    "close tab": "ctrl+w",
-    "switch apps": "alt+tab",
-    "new tab": "ctrl+t",
-    "minimize all": "win+d",
-    "task manager": "ctrl+shift+esc",
-    
-    # File Explorer
-    "open explorer": "win+e",
-    "new folder": "ctrl+shift+n",
-    "rename": "f2",
-    "refresh": "f5",
-    
-    # System Control
-    "lock pc": "win+l",
-    "search": "win+s",
-    "settings": "win+i",
-    "run dialog": "win+r",
-    "volume up": "f11",  # Fn varies; adjust per laptop
-    "volume down": "f12",
-    "brightness up": "f6",
-    "brightness down": "f5",
-    
-    # Browser Specific
-    "new tab": "ctrl+t",  # Duplicate handled
-    "address bar": "ctrl+l",
-    "reload": "ctrl+r",
-    "fullscreen": "f11",
-    
-    # Navigation Mastery (simulated via pyautogui for reliability)
-    "next": lambda: pyautogui.press('tab'),
-    "previous": lambda: pyautogui.hotkey('shift', 'tab'),
-    "click": lambda: pyautogui.press('enter'),
-    "select": lambda: pyautogui.press('space'),
-    "cancel": "esc",
-    
-    # Power User Combos
-    "minimize all windows": "win+m",
-    "screenshot": "win+shift+s",
-    "reopen tab": "ctrl+shift+t",
-    "task view": "win+tab",
-    "security options": "ctrl+alt+del",
-    
-    # Voice control toggles
-    "stop listening": None  # Exits loop
+# ===================== CONFIG =====================
+WAKE_WORDS = ["computer", "assistant", "hey system"]
+UNKNOWN_LOG_FILE = "unknown_commands.json"
+
+# ===================== APPLICATION ALIASES =====================
+APP_ALIASES = {
+    "chrome": "chrome",
+    "google chrome": "chrome",
+    "browser": "chrome",
+    "edge": "edge",
+    "vscode": "visual studio code",
+    "code": "visual studio code",
+    "visual studio code": "visual studio code",
+    "notepad": "notepad",
+    "calculator": "calculator",
+    "cmd": "command prompt",
+    "terminal": "command prompt",
+    "explorer": "file explorer",
+    "files": "file explorer",
+    "settings": "settings",
 }
 
-class VoiceController:
+# ===================== INTENTS =====================
+INTENTS = {
+    "COPY": {
+        "phrases": ["copy", "make a copy", "duplicate"],
+        "action": lambda: keyboard.press_and_release("ctrl+c"),
+        "mode": "EDIT"
+    },
+    "PASTE": {
+        "phrases": ["paste", "insert here"],
+        "action": lambda: keyboard.press_and_release("ctrl+v"),
+        "mode": "EDIT"
+    },
+    "CUT": {
+        "phrases": ["cut", "remove selection"],
+        "action": lambda: keyboard.press_and_release("ctrl+x"),
+        "mode": "EDIT"
+    },
+    "UNDO": {
+        "phrases": ["undo", "go back"],
+        "action": lambda: keyboard.press_and_release("ctrl+z"),
+        "mode": "EDIT"
+    },
+    "NEW_TAB": {
+        "phrases": ["new tab", "open new tab"],
+        "action": lambda: keyboard.press_and_release("ctrl+t"),
+        "mode": "BROWSER"
+    },
+    "ADDRESS_BAR": {
+        "phrases": ["address bar", "search bar", "url bar"],
+        "action": lambda: keyboard.press_and_release("ctrl+l"),
+        "mode": "BROWSER"
+    },
+    "SEARCH": {
+        "phrases": ["search", "find", "look up"],
+        "action": "SEARCH_QUERY",
+        "mode": "BROWSER"
+    },
+    "OPEN_APP": {
+        "phrases": ["open", "launch", "start"],
+        "action": "OPEN_APPLICATION",
+        "mode": "SYSTEM"
+    },
+    "SCREENSHOT": {
+        "phrases": ["screenshot", "take screenshot"],
+        "action": lambda: keyboard.press_and_release("win+shift+s"),
+        "mode": "SYSTEM"
+    },
+}
+
+# ===================== CONTEXT =====================
+class Context:
+    def __init__(self):
+        self.mode = "SYSTEM"
+        self.last_intent = None
+
+context = Context()
+
+# ===================== INTENT RESOLUTION =====================
+def resolve_intent(command):
+    best_intent = None
+    best_score = 0
+
+    for intent, data in INTENTS.items():
+        for phrase in data["phrases"]:
+            score = difflib.SequenceMatcher(None, phrase, command).ratio()
+            if score > best_score:
+                best_score = score
+                best_intent = intent
+
+    return best_intent, best_score
+
+# ===================== UNKNOWN COMMAND LOGGER =====================
+def log_unknown(command):
+    try:
+        data = []
+        try:
+            with open(UNKNOWN_LOG_FILE, "r") as f:
+                data = json.load(f)
+        except:
+            pass
+
+        data.append({
+            "command": command,
+            "time": datetime.now().isoformat()
+        })
+
+        with open(UNKNOWN_LOG_FILE, "w") as f:
+            json.dump(data, f, indent=2)
+    except:
+        pass
+
+# ===================== APP LAUNCHER =====================
+def open_application(spoken_text):
+    app_name = spoken_text
+    for alias, real_name in APP_ALIASES.items():
+        if alias in spoken_text:
+            app_name = real_name
+            break
+
+    keyboard.press_and_release("win")
+    time.sleep(0.4)
+    pyautogui.write(app_name, interval=0.05)
+    time.sleep(0.4)
+    pyautogui.press("enter")
+
+# ===================== UI + ASSISTANT =====================
+class SmartVoiceAssistant:
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title("Voice Shortcuts Panel")
-        self.root.geometry("400x600")
-        self.root.attributes('-topmost', True)
-        self.root.configure(bg='black')
-        self.root.resizable(False, False)
-        
-        # Status label
-        self.status = tk.Label(self.root, text="Listening... Say a command!", fg='green', bg='black', font=('Arial', 12))
+        self.root.title("Smart Voice Assistant")
+        self.root.geometry("500x650")
+        self.root.attributes("-topmost", True)
+
+        self.status = tk.Label(
+            self.root, text="🧠 Say wake word...", font=("Arial", 12), fg="cyan"
+        )
         self.status.pack(pady=10)
-        
-        # Treeview for shortcuts table
-        columns = ("Command", "Shortcut", "Category")
-        self.tree = ttk.Treeview(self.root, columns=columns, show='headings', height=25)
-        self.tree.heading("Command", text="Voice Command")
-        self.tree.heading("Shortcut", text="Shortcut")
-        self.tree.heading("Category", text="Category")
-        self.tree.column("Command", width=150)
-        self.tree.column("Shortcut", width=100)
-        self.tree.column("Category", width=120)
-        self.tree.pack(fill='both', expand=True, padx=10, pady=10)
-        
-        # Populate table with your shortcuts
-        self.populate_table()
-        
-        # Start voice listener in thread
+
+        self.info = tk.Label(self.root, text="Mode: SYSTEM", font=("Arial", 10))
+        self.info.pack()
+
+        self.tree = ttk.Treeview(
+            self.root, columns=("Intent", "Phrases", "Mode"), show="headings"
+        )
+        self.tree.heading("Intent", text="Intent")
+        self.tree.heading("Phrases", text="Example Phrases")
+        self.tree.heading("Mode", text="Mode")
+        self.tree.pack(fill="both", expand=True, padx=10, pady=10)
+
+        for intent, data in INTENTS.items():
+            self.tree.insert(
+                "", "end",
+                values=(intent, ", ".join(data["phrases"]), data["mode"])
+            )
+
         self.listening = True
-        self.thread = threading.Thread(target=self.listen_loop, daemon=True)
-        self.thread.start()
-        
-        # Bind ESC to quit
-        keyboard.add_hotkey('esc', self.stop_listening)
-        
-    def populate_table(self):
-        categories = {
-            "Critical": ["copy", "paste", "cut", "undo", "redo", "select all", "save"],
-            "Window": ["close window", "close tab", "switch apps", "new tab", "minimize all", "task manager"],
-            "Explorer": ["open explorer", "new folder", "rename", "refresh"],
-            "System": ["lock pc", "search", "settings", "run dialog", "volume up", "volume down", "brightness up", "brightness down"],
-            "Browser": ["address bar", "reload", "fullscreen"],
-            "Navigation": ["next", "previous", "click", "select", "cancel"],
-            "Power": ["minimize all windows", "screenshot", "reopen tab", "task view", "security options"]
-        }
-        for cat_items in categories.values():
-            for cmd in cat_items:
-                shortcut = SHORTCUTS[cmd]
-                if callable(shortcut):
-                    shortcut_str = shortcut.__name__
-                else:
-                    shortcut_str = shortcut
-                self.tree.insert("", "end", values=(cmd.title(), shortcut_str, cat_items[0].split()[0].title()))
-    
+        threading.Thread(target=self.listen_loop, daemon=True).start()
+        keyboard.add_hotkey("esc", self.stop)
+
+    # ===================== VOICE LOOP =====================
     def listen_loop(self):
         r = sr.Recognizer()
         mic = sr.Microphone()
-        with mic as source:
-            r.adjust_for_ambient_noise(source)
-        
+
         while self.listening:
             try:
                 with mic as source:
-                    audio = r.listen(source, timeout=1, phrase_time_limit=3)
-                command = r.recognize_google(audio).lower().strip()
-                self.status.config(text=f"Heard: {command}", fg='yellow')
-                self.execute_command(command)
+                    r.adjust_for_ambient_noise(source, duration=0.6)
+                    self.status.config(text="🎤 Listening...", fg="cyan")
+                    audio = r.listen(source, timeout=5, phrase_time_limit=5)
+
+                speech = r.recognize_google(audio).lower().strip()
+                print("Heard:", speech)
+
+                if not any(w in speech for w in WAKE_WORDS):
+                    continue
+
+                self.process_command(speech)
+
             except sr.UnknownValueError:
-                pass  # Ignore unclear speech
-            except sr.RequestError:
-                self.status.config(text="Speech service error", fg='red')
+                self.status.config(text="❓ Didn't catch that", fg="orange")
             except Exception as e:
-                self.status.config(text=f"Error: {str(e)}", fg='red')
-    
-    def execute_command(self, command):
-        for voice_cmd, shortcut in SHORTCUTS.items():
-            if voice_cmd in command:
-                if callable(shortcut):
-                    shortcut()
-                elif shortcut:
-                    keyboard.press_and_release(shortcut)
-                self.status.config(text=f"Executed: {voice_cmd}", fg='green')
-                return
-        self.status.config(text="Command not found", fg='orange')
-    
-    def stop_listening(self):
+                self.status.config(text=str(e), fg="red")
+
+    # ===================== COMMAND PROCESSING =====================
+    def process_command(self, speech):
+        for w in WAKE_WORDS:
+            speech = speech.replace(w, "")
+        speech = speech.strip()
+
+        intent, confidence = resolve_intent(speech)
+
+        if intent and confidence > 0.55:
+            data = INTENTS[intent]
+            context.mode = data["mode"]
+            context.last_intent = intent
+
+            if data["action"] == "SEARCH_QUERY":
+                keyboard.press_and_release("ctrl+l")
+                time.sleep(0.2)
+                pyautogui.write(
+                    speech.replace("search", "").replace("find", "").strip()
+                )
+                pyautogui.press("enter")
+
+            elif data["action"] == "OPEN_APPLICATION":
+                open_application(speech)
+
+            else:
+                data["action"]()
+
+            self.status.config(
+                text=f"✅ {intent} ({confidence:.2f})", fg="green"
+            )
+            self.info.config(text=f"Mode: {context.mode}")
+
+        else:
+            log_unknown(speech)
+            self.status.config(text="⚠️ Unknown command logged", fg="orange")
+
+    def stop(self):
         self.listening = False
         self.root.quit()
-    
+
     def run(self):
         self.root.mainloop()
 
+# ===================== RUN =====================
 if __name__ == "__main__":
-    app = VoiceController()
-    app.run()
+    SmartVoiceAssistant().run()
