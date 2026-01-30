@@ -43,7 +43,7 @@ class DragBlinkTracker:
         self.left_open = None
         self.right_open = None
 
-        self.sensitivity = 1.0
+        self.sensitivity = 2.0
         self.norm_factor = 0.015
 
         # Eye landmarks
@@ -86,7 +86,7 @@ class DragBlinkTracker:
         my = dyn * screen_h * accel * self.sensitivity
 
         self.smooth_x = 0.75 * mx + 0.25 * self.smooth_x
-        self.smooth_y = 0.75 * my + 0.25 * self.smooth_y
+        self.smooth_y = 0.75 * my + 0.25 * self.smooth_y *2
 
         pyautogui.moveRel(int(self.smooth_x), int(self.smooth_y))
 
