@@ -1,34 +1,14 @@
-# ============================================================
-# ZERO-REGRESSION MERGE
-# Nose Cursor + Blink Control  +  Smart Voice Assistant
-# ============================================================
-
 import cv2
 import numpy as np
 import mediapipe as mp
 import pyautogui
 import time
-import threading
-import speech_recognition as sr
-import keyboard
-import tkinter as tk
-from tkinter import ttk
-import json
-import difflib
-from datetime import datetime
 from collections import deque
 
-# ===================== GLOBAL CONTROL =====================
-RUN_EVENT = threading.Event()
-RUN_EVENT.set()
-
 pyautogui.FAILSAFE = False
-SCREEN_W, SCREEN_H = pyautogui.size()
+screen_w, screen_h = pyautogui.size()
 
-# ============================================================
-# ================= NOSE + BLINK CONTROLLER ==================
-# ============================================================
-
+# ===================== MUTED COLOR PALETTE =====================
 BG_PANEL = (28, 28, 28)
 TEXT = (230, 230, 230)
 SOFT_GREEN = (120, 200, 170)
@@ -37,14 +17,13 @@ SOFT_AMBER = (80, 190, 230)
 SOFT_CYAN = (180, 200, 200)
 DIM_GREY = (90, 90, 90)
 
-SATURATION_SCALE = 0.45
-VALUE_SCALE = 1.05
+# ===================== IMAGE TUNING =====================
+SATURATION_SCALE = 0.45   # <--- reduce saturation
+VALUE_SCALE = 1.05        # slight brightness boost
 
-
-class DragBlinkTracker(threading.Thread):
+# ===================== MAIN CLASS =====================
+class DragBlinkTracker:
     def __init__(self):
-        super().__init__(daemon=True)
-
         self.face_mesh = mp.solutions.face_mesh.FaceMesh(
             max_num_faces=1, refine_landmarks=True
         )
@@ -67,16 +46,20 @@ class DragBlinkTracker(threading.Thread):
         self.sensitivity = 2.0
         self.norm_factor = 0.015
 
+        # Eye landmarks
         self.LT, self.LB, self.LL, self.LR = 159, 145, 33, 133
         self.RT, self.RB, self.RL, self.RR = 386, 373, 362, 263
 
+    # ===================== FRAME TONE =====================
     def reduce_saturation(self, frame):
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV).astype(np.float32)
         hsv[..., 1] *= SATURATION_SCALE
         hsv[..., 2] *= VALUE_SCALE
-        hsv[..., 1:] = np.clip(hsv[..., 1:], 0, 255)
+        hsv[..., 1] = np.clip(hsv[..., 1], 0, 255)
+        hsv[..., 2] = np.clip(hsv[..., 2], 0, 255)
         return cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
 
+    # ===================== CALIBRATION =====================
     def calibrate(self, lm, h, w):
         lh = abs(lm[self.LT].y - lm[self.LB].y) * h
         lw = abs(lm[self.LL].x - lm[self.LR].x) * w
@@ -92,24 +75,28 @@ class DragBlinkTracker(threading.Thread):
             self.right_open = np.mean(self.right_buffer)
             self.calibrated = True
 
+    # ===================== MOVEMENT =====================
     def move_cursor(self, dx, dy):
         dxn = np.tanh(dx * self.norm_factor)
         dyn = np.tanh(dy * self.norm_factor)
         speed = np.sqrt(dx * dx + dy * dy)
         accel = 0.12 + speed * 0.001
 
-        mx = dxn * SCREEN_W * accel * self.sensitivity
-        my = dyn * SCREEN_H * accel * self.sensitivity
+        mx = dxn * screen_w * accel * self.sensitivity
+        my = dyn * screen_h * accel * self.sensitivity
 
         self.smooth_x = 0.75 * mx + 0.25 * self.smooth_x
-        self.smooth_y = 0.75 * my + 0.25 * self.smooth_y * 2
+        self.smooth_y = 0.75 * my + 0.25 * self.smooth_y *2
 
         pyautogui.moveRel(int(self.smooth_x), int(self.smooth_y))
 
+    # ===================== UI =====================
     def draw_panel(self, frame):
         cv2.rectangle(frame, (0, 0), (360, 160), BG_PANEL, -1)
         cv2.putText(frame, "Nose Cursor + Blink Control",
                     (15, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, SOFT_CYAN, 2)
+        cv2.putText(frame, f"Sensitivity: {self.sensitivity:.1f}",
+                    (15, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.55, TEXT, 1)
 
         status = "CALIBRATING" if not self.calibrated else "ACTIVE"
         color = SOFT_AMBER if not self.calibrated else SOFT_GREEN
@@ -126,10 +113,12 @@ class DragBlinkTracker(threading.Thread):
         cv2.rectangle(frame, (x, y), (x + 120, y + 10), DIM_GREY, 1)
         cv2.rectangle(frame, (x, y), (x + bar, y + 10), color, -1)
 
+    # ===================== MAIN =====================
     def run(self):
         cap = cv2.VideoCapture(0)
+        print("🔄 Calibrating — keep eyes open")
 
-        while RUN_EVENT.is_set():
+        while True:
             ret, frame = cap.read()
             if not ret:
                 break
@@ -138,13 +127,13 @@ class DragBlinkTracker(threading.Thread):
             frame = self.reduce_saturation(frame)
 
             h, w, _ = frame.shape
-            res = self.face_mesh.process(
-                cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            )
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            res = self.face_mesh.process(rgb)
 
             if res.multi_face_landmarks:
                 lm = res.multi_face_landmarks[0].landmark
                 nx, ny = int(lm[1].x * w), int(lm[1].y * h)
+                cv2.circle(frame, (nx, ny), 5, SOFT_GREEN, -1)
 
                 lh = abs(lm[self.LT].y - lm[self.LB].y) * h
                 lw = abs(lm[self.LL].x - lm[self.LR].x) * w
@@ -176,110 +165,19 @@ class DragBlinkTracker(threading.Thread):
                     self.draw_eye_bar(frame, 15, 120, l_ratio, self.left_open, "Left Eye")
                     self.draw_eye_bar(frame, 15, 145, r_ratio, self.right_open, "Right Eye")
 
+            key = cv2.waitKey(1) & 0xFF
+            if key in (ord('+'), ord('=')):
+                self.sensitivity = min(3.0, self.sensitivity + 0.1)
+            elif key == ord('-'):
+                self.sensitivity = max(0.2, self.sensitivity - 0.1)
+            elif key == ord('q'):
+                break
+
             cv2.imshow("Smart Nose Cursor", frame)
-            if cv2.waitKey(1) & 0xFF == ord("q"):
-                RUN_EVENT.clear()
 
         cap.release()
         cv2.destroyAllWindows()
 
-# ============================================================
-# ================= SMART VOICE ASSISTANT ====================
-# ============================================================
-
-WAKE_WORDS = ["computer", "assistant", "hey system"]
-UNKNOWN_LOG_FILE = "unknown_commands.json"
-
-APP_ALIASES = {
-    "chrome": "chrome",
-    "edge": "edge",
-    "vscode": "visual studio code",
-    "notepad": "notepad",
-    "calculator": "calculator",
-}
-
-INTENTS = {
-    "COPY": {"phrases": ["copy"], "action": lambda: keyboard.press_and_release("ctrl+c"), "mode": "EDIT"},
-    "PASTE": {"phrases": ["paste"], "action": lambda: keyboard.press_and_release("ctrl+v"), "mode": "EDIT"},
-    "UNDO": {"phrases": ["undo"], "action": lambda: keyboard.press_and_release("ctrl+z"), "mode": "EDIT"},
-}
-
-
-class SmartVoiceAssistant(threading.Thread):
-    def __init__(self):
-        super().__init__(daemon=True)
-        self.listening = True
-
-    def resolve_intent(self, command):
-        best, score = None, 0
-        for intent, data in INTENTS.items():
-            for phrase in data["phrases"]:
-                s = difflib.SequenceMatcher(None, phrase, command).ratio()
-                if s > score:
-                    best, score = intent, s
-        return best, score
-
-    def run(self):
-        r = sr.Recognizer()
-        r.energy_threshold = 300
-        r.dynamic_energy_threshold = True
-
-        mic = sr.Microphone()
-
-        # ✅ CALIBRATE ONCE
-        with mic as src:
-            print("🎤 Calibrating microphone...")
-            r.adjust_for_ambient_noise(src, duration=1.0)
-            print("✅ Voice assistant ready")
-
-        while RUN_EVENT.is_set():
-            try:
-                with mic as src:
-                    print("🎧 Listening...")
-                    audio = r.listen(src, timeout=5, phrase_time_limit=5)
-
-                speech = r.recognize_google(audio).lower().strip()
-                print("🗣 Heard:", speech)
-
-                # ✅ RELAXED WAKE WORD CHECK
-                wake_detected = any(
-                    difflib.SequenceMatcher(None, w, speech).ratio() > 0.6
-                    or w in speech
-                    for w in WAKE_WORDS
-                )
-
-                if not wake_detected:
-                    continue
-
-                # remove wake words
-                for w in WAKE_WORDS:
-                    speech = speech.replace(w, "")
-                speech = speech.strip()
-
-                intent, conf = self.resolve_intent(speech)
-                print(f"🎯 Intent: {intent}, Confidence: {conf:.2f}")
-
-                if intent and conf > 0.55:
-                    INTENTS[intent]["action"]()
-
-            except sr.WaitTimeoutError:
-                continue
-            except sr.UnknownValueError:
-                print("❓ Could not understand audio")
-            except Exception as e:
-                print("🔥 Voice error:", e)
-
-
-# ============================================================
-# ============================ MAIN ==========================
-# ============================================================
-
+# ===================== RUN =====================
 if __name__ == "__main__":
-    DragBlinkTracker().start()
-    SmartVoiceAssistant().start()
-
-    try:
-        while RUN_EVENT.is_set():
-            time.sleep(0.5)
-    except KeyboardInterrupt:
-        RUN_EVENT.clear()
+    DragBlinkTracker().run()
