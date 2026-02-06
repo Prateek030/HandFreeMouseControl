@@ -239,5 +239,5 @@ class SmartVoiceAssistant:
         self.root.mainloop()
 
 # ===================== RUN =====================
-if __name__ == "__main__":
-    SmartVoiceAssistant().run()
+# if __name__ == "__main__":
+#     SmartVoiceAssistant().run()
