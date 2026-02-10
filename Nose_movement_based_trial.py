@@ -63,6 +63,7 @@ class DragBlinkTracker(threading.Thread):
 
     # ===================== CALIBRATION =====================
     def calibrate(self, lm, h, w):
+        # print("🔄 Calibrating — keep eyes open")
         lh = abs(lm[self.LT].y - lm[self.LB].y) * h
         lw = abs(lm[self.LL].x - lm[self.LR].x) * w
         rh = abs(lm[self.RT].y - lm[self.RB].y) * h
@@ -116,69 +117,68 @@ class DragBlinkTracker(threading.Thread):
         cv2.rectangle(frame, (x, y), (x + bar, y + 10), color, -1)
 
     # ===================== MAIN =====================
-    def run(self):
-        cap = cv2.VideoCapture(0)
-        print("🔄 Calibrating — keep eyes open")
+    def run(self, frame):
+        # cap = cv2.VideoCapture(0)
 
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
+        # while True:
+        # ret, frame = cap.read()
+        # if not ret:
+        #     break
+        frame = cv2.flip(frame, 1)
+        frame = self.reduce_saturation(frame)
 
-            frame = cv2.flip(frame, 1)
-            frame = self.reduce_saturation(frame)
+        h, w, _ = frame.shape
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        res = self.face_mesh.process(rgb)
 
-            h, w, _ = frame.shape
-            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            res = self.face_mesh.process(rgb)
+        if res.multi_face_landmarks:
+            lm = res.multi_face_landmarks[0].landmark
+            nx, ny = int(lm[1].x * w), int(lm[1].y * h)
+            cv2.circle(frame, (nx, ny), 5, SOFT_GREEN, -1)
 
-            if res.multi_face_landmarks:
-                lm = res.multi_face_landmarks[0].landmark
-                nx, ny = int(lm[1].x * w), int(lm[1].y * h)
-                cv2.circle(frame, (nx, ny), 5, SOFT_GREEN, -1)
+            lh = abs(lm[self.LT].y - lm[self.LB].y) * h
+            lw = abs(lm[self.LL].x - lm[self.LR].x) * w
+            rh = abs(lm[self.RT].y - lm[self.RB].y) * h
+            rw = abs(lm[self.RL].x - lm[self.RR].x) * w
 
-                lh = abs(lm[self.LT].y - lm[self.LB].y) * h
-                lw = abs(lm[self.LL].x - lm[self.LR].x) * w
-                rh = abs(lm[self.RT].y - lm[self.RB].y) * h
-                rw = abs(lm[self.RL].x - lm[self.RR].x) * w
+            l_ratio = lh / (lw + 1e-6)
+            r_ratio = rh / (rw + 1e-6)
 
-                l_ratio = lh / (lw + 1e-6)
-                r_ratio = rh / (rw + 1e-6)
+            if not self.calibrated:
+                self.calibrate(lm, h, w)
+            else:
+                if self.prev_nose:
+                    self.move_cursor(nx - self.prev_nose[0],
+                                        ny - self.prev_nose[1])
 
-                if not self.calibrated:
-                    self.calibrate(lm, h, w)
-                else:
-                    if self.prev_nose:
-                        self.move_cursor(nx - self.prev_nose[0],
-                                         ny - self.prev_nose[1])
+                now = time.time()
+                if l_ratio < self.left_open * 0.45 and now - self.left_click_time > 0.5:
+                    pyautogui.leftClick()
+                    self.left_click_time = now
+                if r_ratio < self.right_open * 0.45 and now - self.right_click_time > 0.5:
+                    pyautogui.rightClick()
+                    self.right_click_time = now
 
-                    now = time.time()
-                    if l_ratio < self.left_open * 0.45 and now - self.left_click_time > 0.5:
-                        pyautogui.leftClick()
-                        self.left_click_time = now
-                    if r_ratio < self.right_open * 0.45 and now - self.right_click_time > 0.5:
-                        pyautogui.rightClick()
-                        self.right_click_time = now
+            self.prev_nose = (nx, ny)
 
-                self.prev_nose = (nx, ny)
+            self.draw_panel(frame)
+            if self.calibrated:
+                self.draw_eye_bar(frame, 15, 120, l_ratio, self.left_open, "Left Eye")
+                self.draw_eye_bar(frame, 15, 145, r_ratio, self.right_open, "Right Eye")
 
-                self.draw_panel(frame)
-                if self.calibrated:
-                    self.draw_eye_bar(frame, 15, 120, l_ratio, self.left_open, "Left Eye")
-                    self.draw_eye_bar(frame, 15, 145, r_ratio, self.right_open, "Right Eye")
+        # key = cv2.waitKey(1) & 0xFF
+        # if key in (ord('+'), ord('=')):
+        #     self.sensitivity = min(3.0, self.sensitivity + 0.1)
+        # elif key == ord('-'):
+        #     self.sensitivity = max(0.2, self.sensitivity - 0.1)
+        # elif key == ord('q'):
+        #     break
 
-            key = cv2.waitKey(1) & 0xFF
-            if key in (ord('+'), ord('=')):
-                self.sensitivity = min(3.0, self.sensitivity + 0.1)
-            elif key == ord('-'):
-                self.sensitivity = max(0.2, self.sensitivity - 0.1)
-            elif key == ord('q'):
-                break
+        # cv2.imshow("Smart Nose Cursor", frame)
+        return frame
 
-            cv2.imshow("Smart Nose Cursor", frame)
-
-        cap.release()
-        cv2.destroyAllWindows()
+        # cap.release()
+        # cv2.destroyAllWindows()
 
 # ===================== RUN =====================
 # if __name__ == "__main__":

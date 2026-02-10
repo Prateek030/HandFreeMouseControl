@@ -139,32 +139,32 @@ def open_application(spoken_text):
 # ===================== UI + ASSISTANT =====================
 class SmartVoiceAssistant:
     def __init__(self):
-        self.root = tk.Tk()
-        self.root.title("Smart Voice Assistant")
-        self.root.geometry("500x650")
-        self.root.attributes("-topmost", True)
+        # self.root = tk.Tk()
+        # self.root.title("Smart Voice Assistant")
+        # self.root.geometry("500x650")
+        # self.root.attributes("-topmost", True)
 
-        self.status = tk.Label(
-            self.root, text="🧠 Say wake word...", font=("Arial", 12), fg="cyan"
-        )
-        self.status.pack(pady=10)
+        # self.status = tk.Label(
+        #     self.root, text="🧠 Say wake word...", font=("Arial", 12), fg="cyan"
+        # )
+        # self.status.pack(pady=10)
 
-        self.info = tk.Label(self.root, text="Mode: SYSTEM", font=("Arial", 10))
-        self.info.pack()
+        # self.info = tk.Label(self.root, text="Mode: SYSTEM", font=("Arial", 10))
+        # self.info.pack()
 
-        self.tree = ttk.Treeview(
-            self.root, columns=("Intent", "Phrases", "Mode"), show="headings"
-        )
-        self.tree.heading("Intent", text="Intent")
-        self.tree.heading("Phrases", text="Example Phrases")
-        self.tree.heading("Mode", text="Mode")
-        self.tree.pack(fill="both", expand=True, padx=10, pady=10)
+        # self.tree = ttk.Treeview(
+        #     self.root, columns=("Intent", "Phrases", "Mode"), show="headings"
+        # )
+        # self.tree.heading("Intent", text="Intent")
+        # self.tree.heading("Phrases", text="Example Phrases")
+        # self.tree.heading("Mode", text="Mode")
+        # self.tree.pack(fill="both", expand=True, padx=10, pady=10)
 
-        for intent, data in INTENTS.items():
-            self.tree.insert(
-                "", "end",
-                values=(intent, ", ".join(data["phrases"]), data["mode"])
-            )
+        # for intent, data in INTENTS.items():
+            # self.tree.insert(
+            #     "", "end",
+            #     values=(intent, ", ".join(data["phrases"]), data["mode"])
+            # )
 
         self.listening = True
         threading.Thread(target=self.listen_loop, daemon=True).start()
@@ -175,25 +175,26 @@ class SmartVoiceAssistant:
         r = sr.Recognizer()
         mic = sr.Microphone()
 
-        while self.listening:
-            try:
-                with mic as source:
-                    r.adjust_for_ambient_noise(source, duration=0.6)
-                    self.status.config(text="🎤 Listening...", fg="cyan")
-                    audio = r.listen(source, timeout=5, phrase_time_limit=5)
+        try:
+            with mic as source:
+                r.adjust_for_ambient_noise(source, duration=0.6)
+                self.status.config(text="🎤 Listening...", fg="cyan")
+                audio = r.listen(source, timeout=5, phrase_time_limit=5)
 
-                speech = r.recognize_google(audio).lower().strip()
-                print("Heard:", speech)
+            speech = r.recognize_google(audio).lower().strip()
+            print("Heard:", speech)
 
-                if not any(w in speech for w in WAKE_WORDS):
-                    continue
+            if not any(w in speech for w in WAKE_WORDS):
+                return
 
-                self.process_command(speech)
+            self.process_command(speech)
 
-            except sr.UnknownValueError:
-                self.status.config(text="❓ Didn't catch that", fg="orange")
-            except Exception as e:
-                self.status.config(text=str(e), fg="red")
+        except sr.UnknownValueError:
+            print('An Error Occured')
+            return 
+        except Exception as e:
+            print('An Error Occured')
+            return 
 
     # ===================== COMMAND PROCESSING =====================
     def process_command(self, speech):
@@ -225,7 +226,7 @@ class SmartVoiceAssistant:
             self.status.config(
                 text=f"✅ {intent} ({confidence:.2f})", fg="green"
             )
-            self.info.config(text=f"Mode: {context.mode}")
+            # self.info.config(text=f"Mode: {context.mode}")
 
         else:
             log_unknown(speech)
@@ -233,10 +234,11 @@ class SmartVoiceAssistant:
 
     def stop(self):
         self.listening = False
-        self.root.quit()
+        # self.root.quit()
 
     def run(self):
-        self.root.mainloop()
+        # self.root.mainloop()
+        self.listen_loop()
 
 # ===================== RUN =====================
 # if __name__ == "__main__":
