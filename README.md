@@ -1,112 +1,229 @@
-# Nose-Controlled Mouse with Eye Blinks 🖱️👃
+Below is a **polished, production-quality `README.md`** generated **specifically from your updated files and their actual behavior**:
 
-Hey there! This is a super cool hands-free mouse controller that uses your **nose movements** for cursor control and **eye blinks** for clicking. Perfect for accessibility projects, demos, or just messing around with computer vision!
+* `main.py` → **Master GUI launcher**
+* `MouseControl.py` → **Nose + blink mouse control**
+* `voice_command.py` → **Voice assistant**
 
-## What It Does ✨
+This README accurately reflects what the code does today, not aspirational features, and is suitable for **GitHub, portfolio, or research demos**
 
-- **Nose tracking** → Smooth cursor movement (just like a real mouse)
-- **Left eye blink** → Toggle **drag mode** (click + drag!)
-- **Right eye blink** → **Right click**
-- **Smart calibration** → Works with your unique eye size
-- **Sensitivity control** → Fine-tune with +/- keys
+---
 
-## Quick Demo 📹
+# 🧠 Unified Human–Computer Interaction System
+
+A **hands-free multimodal human–computer interaction system** that combines
+**computer vision–based mouse control** and **voice commands**, orchestrated by a **single master GUI**.
+
+This project enables users to control a computer using:
+
+* 🖱️ **Nose movement** for cursor control
+* 👁️ **Eye blinks** for mouse clicks
+* 🎙️ **Voice commands** for system and application control
+
+All subsystems are launched, monitored, and terminated from **one master control panel**.
+
+---
+
+## ✨ Key Features
+
+### 🎯 Mouse Control (Computer Vision)
+
+* Nose movement → smooth cursor movement
+* Left eye blink → left click
+* Right eye blink → right click
+* Automatic eye-open calibration
+* Adaptive acceleration (fast flicks move faster)
+* Muted, low-saturation camera UI for reduced eye strain
+* Adjustable sensitivity (`+` / `-` keys)
+
+### 🎙️ Voice Command Assistant
+
+* Wake-word based activation
+* Intent recognition with confidence scoring
+* Application launching (Chrome, VS Code, Explorer, etc.)
+* Editing & browser shortcuts (copy, paste, undo, new tab…)
+* Context-aware modes (SYSTEM / EDIT / BROWSER)
+* Unknown command logging for future learning
+
+### 🪟 Master Control GUI
+
+* Single launcher (`main.py`)
+* Start / stop each subsystem independently
+* Clean shutdown of child processes
+* Prevents camera & microphone conflicts
+* Fault-tolerant (each subsystem runs in its own process)
+
+---
+
+## 🏗️ Architecture Overview
 
 ```
-2-second calibration → Nose moves cursor → Left blink drags → Right blink right-clicks
+main.py
+│
+├── MouseControl.py
+│   └── Nose-based cursor + blink detection (OpenCV + MediaPipe)
+│
+├── voice_command.py
+│   └── Voice assistant (SpeechRecognition + rule-based NLP)
+│
+└── OS-level process isolation (subprocess)
 ```
 
-## Getting Started 🚀
+Each module runs in a **separate Python process**, ensuring:
 
-1. **Install dependencies:**
+* Stability
+* No shared event loops
+* No device contention
+* Easy extensibility
+
+---
+
+## 📁 Project Structure
+
+```
+project/
+│
+├── main.py                 # Master GUI launcher
+├── MouseControl.py         # Nose + blink mouse control
+├── voice_command.py        # Voice assistant
+├── unknown_commands.json   # Auto-generated (voice assistant)
+└── README.md
+```
+
+---
+
+## 🚀 Getting Started
+
+### 1️⃣ Clone the Repository
+
 ```bash
-pip install opencv-python mediapipe pyautogui numpy
+git clone <your-repo-url>
+cd project
 ```
 
-2. **Run it:**
+### 2️⃣ Install Dependencies
+
 ```bash
-python nose_tracker.py
+pip install opencv-python mediapipe numpy pyautogui
+pip install SpeechRecognition keyboard
 ```
 
-3. **Calibrate** (automatic 2 seconds):
-- Look straight ahead
-- Fill ~70% of your camera frame
-- Done! 🎉
+#### Windows (Microphone Support)
 
-## Controls 🎮
+If `pyaudio` fails:
 
-| Action | Control |
-|--------|---------|
-| Move cursor | Nose left/right/up/down |
-| **Toggle Drag** | **Left eye blink** |
-| Right click | Right eye blink |
-| Increase sensitivity | `+` or `=` |
-| Decrease sensitivity | `-` |
-| Quit | `Q` |
-
-## How the Magic Works 🧙‍♂️
-
-```
-Nose → MediaPipe FaceMesh (landmark #1) → Proportional cursor velocity
-Eyes → Calibrated EAR (Eye Aspect Ratio) → Smart blink detection
-Clicks → PyAutoGUI → Real mouse events
+```bash
+pip install pipwin
+pipwin install pyaudio
 ```
 
-**Pro tip:** Sensitivity around `1.0-1.5` feels most natural!
+---
 
-## Tech Stack 🛠️
+### 3️⃣ Run the System
 
-```
-• MediaPipe FaceMesh - Real-time face landmarks
-• OpenCV - Video processing  
-• PyAutoGUI - Cross-platform mouse control
-• NumPy - Smooth math
-• Python 3.8+ - Clean & simple
+```bash
+python main.py
 ```
 
-## Troubleshooting 🔧
+This opens the **Master Human Interface Controller**.
 
-**"Calibration won't finish"**
-```
-• Face must fill 70% of camera frame
-• Good lighting (avoid backlighting)
-• Look straight at camera
-```
+From the GUI:
 
-**"Too many false clicks"**
-```
-• Increase blink confirmation frames (code line 85)
-• Adjust ratio threshold (line 82: `0.4` → `0.3`)
-```
+* ▶ Start **Nose Cursor + Blink**
+* ▶ Start **Voice Assistant**
+* ⏹ Stop either independently
+* 🛑 Quit all safely
 
-## Performance 📊
+---
 
-```
-✅ 30+ FPS on laptop webcam
-✅ <50ms cursor response  
-✅ 98% blink accuracy (post-calibration)
-✅ Windows/Mac/Linux compatible
-```
+## 🎮 Controls
 
-## Future Ideas 💡
+### 🖱️ Mouse Control (Camera Window)
 
-- Double blink → Scroll mode
-- Head pose compensation
-- Gesture shortcuts (wink = copy?)
-- TensorRT for Jetson Nano 🚀
+| Action               | Control         |
+| -------------------- | --------------- |
+| Cursor move          | Nose movement   |
+| Left click           | Left eye blink  |
+| Right click          | Right eye blink |
+| Increase sensitivity | `+` or `=`      |
+| Decrease sensitivity | `-`             |
+| Quit mouse control   | `Q`             |
 
-## Made With ❤️
+---
 
-Built for fun + accessibility. Hope you enjoy controlling your computer with just your face!
+### 🎙️ Voice Assistant
 
-```
-~ Your friendly computer vision enthusiast
-```
+**Wake words**
 
-***
+* `computer`
+* `assistant`
+* `hey system`
 
-⭐ **Star if you found this useful!**  
-🐛 **Issues?** Open a PR!  
-📱 **Demo video coming soon...**
+**Example commands**
 
-**P.S.** This started as a "can I make a nose mouse?" experiment and became way cooler than expected! 😄
+* “computer open chrome”
+* “assistant new tab”
+* “hey system copy”
+* “computer paste”
+* “assistant take screenshot”
+
+---
+
+## 🧠 Design Philosophy
+
+* Zero-regression integration
+* Hardware isolation (camera & mic)
+* Human-centric interaction
+* Research-ready structure
+* Assistive-technology friendly
+
+This architecture is intentionally designed to support:
+
+* Adaptive learning
+* Multimodal intent fusion
+* Reinforcement-based personalization
+* Accessibility research
+
+---
+
+## 🔮 Future Enhancements
+
+* Voice-controlled cursor modes (precision / fast)
+* Learning-based sensitivity adaptation
+* Gaze-only fallback (no nose movement)
+* Inter-process intent bus (IPC)
+* Health monitoring & auto-restart
+* Single-EXE packaging
+
+---
+
+## ⚠️ Known Limitations
+
+* Requires stable lighting for face tracking
+* Microphone quality affects recognition accuracy
+* Single-user calibration per session
+
+---
+
+## 🛡️ Disclaimer
+
+This software controls system-level input (mouse & keyboard).
+Use responsibly.
+Do **not** run with elevated/admin privileges.
+
+---
+
+## 👤 Author
+
+**Pratik Chopade**
+Computer Vision • Human–Computer Interaction • Generative AI
+
+---
+
+If you want next, I can:
+
+* 📦 Package this into a **Windows EXE**
+* 🧠 Add **learning-based adaptation**
+* 🔊 Let **voice commands control mouse sensitivity**
+* 📊 Add **real-time diagnostics in the master GUI**
+
+Just tell me the next step 🚀
